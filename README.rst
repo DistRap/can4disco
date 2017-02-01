@@ -18,8 +18,10 @@ Fedora::
 Building
 --------
 
-./standalone-setup.sh # required if you don't have checked out ivory tower and ivory-tower-stm32 repos in ..
-make
+To build all images::
+
+  ./standalone-setup.sh # required if you don't have checked out ivory tower and ivory-tower-stm32 repos in ..
+  make
 
 Tests
 -----
@@ -35,6 +37,6 @@ CANLoop
 Flashing
 --------
 
-::
-  # via BlackMagic Probe
+With BlackMagic Probe::
+
   arm-none-eabi-gdb --ex 'target extended-remote /dev/ttyACM0' --ex 'monitor swdp_scan' --ex 'attach 1' --ex 'load' build/canloop-test/image
