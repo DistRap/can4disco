@@ -1,0 +1,21 @@
+CAN4DISCO firmware
+
+Written in http://ivorylang.org/
+
+Requires:
+
+stack
+
+Fedora:
+
+- arm-none-eabi-newlib
+- arm-none-eabi-gcc-cs
+
+Building:
+
+make
+
+Tests:
+
+CANLoop - test application sending packets from CAN1 to CAN2 and vice versa
+triggering LEDs on received messages. Image available in build/canloop-test/image

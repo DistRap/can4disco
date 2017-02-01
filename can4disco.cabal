@@ -1,0 +1,69 @@
+
+name:                can4disco
+version:             0.1.0.0
+synopsis:            can4disco firmware
+-- description:
+license:             BSD3
+author:              Richard Marko
+maintainer:          srk@48.io
+copyright:           2017 Richard Marko
+-- category:
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     C4D.Platforms
+                       C4D.Tests.CANSendRecv
+                       C4D.Tests.CANLoop
+
+--                       BSP.Tests.UART.Types,
+--                       BSP.Tests.UART.Buffer,
+--                       BSP.Tests.UART.TestApp,
+
+  build-depends:       base >= 4.6,
+                       monadLib,
+                       ivory,
+                       ivory-stdlib,
+                       ivory-hw,
+                       tower              >= 0.9,
+                       tower-config,
+                       tower-hal,
+                       tower-freertos-stm32 >= 0.9,
+                       ivory-bsp-stm32,
+                       ivory-bsp-tests
+
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+
+executable cansendrecv-test-gen
+  main-is:             CANSendRecv.hs
+  hs-source-dirs:      test
+  build-depends:       base >= 4.6,
+                       ivory,
+                       ivory-stdlib,
+                       ivory-backend-c,
+                       ivory-hw,
+                       tower          >= 0.9,
+                       tower-config,
+                       tower-freertos-stm32,
+                       ivory-bsp-stm32,
+                       ivory-bsp-tests,
+                       can4disco
+  ghc-options:          -Wall
+
+executable canloop-test-gen
+  main-is:             CANLoopTest.hs
+  hs-source-dirs:      test
+  build-depends:       base >= 4.6,
+                       ivory,
+                       ivory-stdlib,
+                       ivory-backend-c,
+                       ivory-hw,
+                       tower          >= 0.9,
+                       tower-config,
+                       tower-freertos-stm32,
+                       ivory-bsp-stm32,
+                       ivory-bsp-tests,
+                       can4disco
+  ghc-options:          -Wall
