@@ -85,7 +85,7 @@ app tocc totestcan1 totestcan2 touart toleds = do
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
   (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
-  periodic <- period (Milliseconds 250)
+  -- periodic <- period (Milliseconds 250)
 
   canSend' req canctl_output
 
@@ -117,7 +117,7 @@ app tocc totestcan1 totestcan2 touart toleds = do
         count <- deref received2
         store received2 (count + 1)
         puts o "\n\rrcv\n\r"
-        l <- deref (msg ~> can_message_len)
+        -- l <- deref (msg ~> can_message_len)
         arrayMap $ \ix -> do
             --when (fromIx ix <? 8) $ do
               val <- deref ((msg ~> can_message_buf) ! ix)
@@ -141,8 +141,6 @@ echoPrompt greeting ostream istream canctl = do
 
 
   monitor "echoprompt" $ do
-    (buf  :: Ref 'Global ('Array 8 ('Stored Uint8))) <- stateInit "buf" (iarray [])
-    (ixref  :: Ref 'Global ('Stored Uint8)) <- stateInit "ixref" izero
     (incoming :: Ref 'Global UARTBuffer) <- state "incoming"
     initialized <- stateInit "initialized" (ival false)
 
