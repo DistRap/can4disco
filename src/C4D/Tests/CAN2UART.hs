@@ -169,7 +169,7 @@ echoPrompt greeting ostream istream canctl = do
         let testChar = (input `isChar`)
         pos <- deref (incoming ~> stringLengthL)
         --a <- local $ iarray [0..7]
-        when (pos ==? 6) $ do
+        when (pos ==? 8) $ do
           --arrayMap $ \ix -> do
           --  when (fromIx ix <? 8) $ do
           --    val <- deref ((incoming ~> stringDataL) ! ix)
