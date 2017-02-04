@@ -1,7 +1,7 @@
 #include ../stack.mk
 
-IVORYFLAGS ?= --const-fold
-TESTS      := cansendrecv-test canloop-test
+IVORYFLAGS ?= --const-fold --verbose
+TESTS      := cansendrecv-test canloop-test can2uart-test
 AADL_TESTS := 
 CLEANS     := $(foreach test,$(TESTS),$(test)-clean) \
 	            $(foreach test,$(AADL_TESTS),$(test)_clean)
