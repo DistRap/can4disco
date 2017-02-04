@@ -96,11 +96,9 @@ data TestPlatform =
   TestPlatform
     { testplatform_leds  :: ColoredLEDs
     , testplatform_uart  :: TestUART
-    , testplatform_spi   :: TestSPI
     , testplatform_i2c   :: TestI2C
     , testplatform_can1  :: TestCAN
     , testplatform_can2  :: TestCAN
-    , testplatform_dma   :: TestDMA
     , testplatform_rng   :: RNG
     , testplatform_stm32 :: STM32Config
     }
@@ -124,10 +122,6 @@ can4disco = TestPlatform
         , uartPinAF = F405.gpio_af_uart2
         }
     }
-  , testplatform_spi = TestSPI
-      { testSPIPeriph = F405.spi3
-      , testSPIPins   = spi3_pins
-      }
   , testplatform_i2c = TestI2C
       { testI2C = F405.i2c2
       , testI2CPins = I2CPins
@@ -147,29 +141,6 @@ can4disco = TestPlatform
       , testCANTX = F405.pinB6
       , testCANFilters = F405.canFilters
       }
-  , testplatform_dma = error "DMA tests not supported on this platform"
   , testplatform_rng = F405.rng
   , testplatform_stm32 = stm32f405Defaults 8
   }
-
-spi3_pins :: SPIPins
-spi3_pins = SPIPins
-  { spiPinMiso = F405.pinC12
-  , spiPinMosi = F405.pinC11
-  , spiPinSck  = F405.pinC10
-  , spiPinAF   = F405.gpio_af_spi3
-  }
-
---testplatform_can1 = TestCAN
---      { testCAN = F405.can1
---      , testCANRX = F405.pinB8
---      , testCANTX = F405.pinB9
---      , testCANFilters = F405.canFilters
---      }
---
---testplatform_can2 = TestCAN
---      { testCAN = F405.can2
---      , testCANRX = F405.pinB5
---      , testCANTX = F405.pinB6
---      , testCANFilters = F405.can2Filters
---      }
