@@ -26,13 +26,16 @@ To build all images::
 Tests
 -----
 
-CANSendRcv
+CANSendRecv
   test application sending packets from CAN1, blinks on received packets.
-  Image available in build/cansendrcv-test/image
+  Image available in build/cansendrecv-test/image
 CANLoop
   test application sending packets from CAN1 to CAN2 and vice versa
   triggering LEDs on received messages.
   Image available in build/canloop-test/image
+CAN2UART
+  can2uart bridge
+  Image available in build/can2uart-test/image
 
 Flashing
 --------
