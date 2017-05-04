@@ -62,7 +62,7 @@ app tocc totestcan1 totestcan2 toleds = do
   can2  <- fmap totestcan2 getEnv
   leds <- fmap toleds    getEnv
 
-  (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
+  (res, req, _, _) <- canTower tocc (testCAN can1)   1000000 (testCANRX can1) (testCANTX can1)
   (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
   periodic <- period (Milliseconds 250)
