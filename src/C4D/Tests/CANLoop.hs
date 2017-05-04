@@ -79,7 +79,6 @@ app tocc totestcan1 totestcan2 toleds = do
                       [CANFilterBank CANFIFO1 CANFilterMask $ CANFilter32 emptyID emptyID]
         ledSetup $ redLED leds
         ledSetup $ blueLED leds
-        --ledOn    $ redLED leds
 
     received <- stateInit "can_received_count" (ival (0 :: Uint32))
     received2 <- stateInit "can2_received_count" (ival (0 :: Uint32))
@@ -88,14 +87,12 @@ app tocc totestcan1 totestcan2 toleds = do
       callback $ const $ do
         count <- deref received
         store received (count + 1)
-        --(ledOn  $ redLED leds)
         ifte_ (count .& 1 ==? 0)
           (ledOff $ redLED leds)
           (ledOn  $ redLED leds)
 
     handler res2 "result2" $ do
       callback $ const $ do
-        --(ledOn  $ blueLED leds)
         count <- deref received2
         store received2 (count + 1)
         ifte_ (count .& 1 ==? 0)

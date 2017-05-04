@@ -85,8 +85,6 @@ app tocc totestcan1 totestcan2 touart toleds = do
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
   (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
-  -- periodic <- period (Milliseconds 250)
-
   canSend' req canctl_output
 
   monitor "simplecontroller" $ do
@@ -168,18 +166,11 @@ echoPrompt greeting ostream istream canctl = do
         push input
         let testChar = (input `isChar`)
         pos <- deref (incoming ~> stringLengthL)
-        --a <- local $ iarray [0..7]
         when (pos ==? 8) $ do
-          --arrayMap $ \ix -> do
-          --  when (fromIx ix <? 8) $ do
-          --    val <- deref ((incoming ~> stringDataL) ! ix)
-          --    putc o val
 
           let msgid = standardCANID (fromRep 0x7FF) (boolToBit false)
           r <- local $ istruct
             [ can_message_id  .= ival msgid
---            , can_message_buf .= deref buf
---                iarray [ ival $ bitCast $ time `iShiftR` fromInteger (8 * i) | i <- [7,6..0] ]
             , can_message_len .= ival 8
             ]
           -- arrayCopy: to from offset len
