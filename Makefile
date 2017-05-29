@@ -5,7 +5,8 @@ IVORYFLAGS ?= --const-fold --verbose
 TESTS      := \
 	cansendrecv-test \
 	canloop-test \
-	can2uart-test
+	can2uart-test \
+	slcan-test
 
 AADL_TESTS :=
 CLEANS     := $(foreach test,$(TESTS),$(test)-clean) \

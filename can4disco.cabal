@@ -17,6 +17,7 @@ library
                        C4D.Tests.CANSendRecv
                        C4D.Tests.CANLoop
                        C4D.Tests.CAN2UART
+                       C4D.Tests.SLCAN
 
 --                       BSP.Tests.UART.Types,
 --                       BSP.Tests.UART.Buffer,
@@ -71,6 +72,22 @@ executable canloop-test-gen
 
 executable can2uart-test-gen
   main-is:             CAN2UART.hs
+  hs-source-dirs:      test
+  build-depends:       base >= 4.6,
+                       ivory,
+                       ivory-stdlib,
+                       ivory-backend-c,
+                       ivory-hw,
+                       tower          >= 0.9,
+                       tower-config,
+                       tower-freertos-stm32,
+                       ivory-bsp-stm32,
+                       ivory-bsp-tests,
+                       can4disco
+  ghc-options:          -Wall
+
+executable slcan-test-gen
+  main-is:             SLCAN.hs
   hs-source-dirs:      test
   build-depends:       base >= 4.6,
                        ivory,
