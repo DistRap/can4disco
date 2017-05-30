@@ -18,6 +18,7 @@ import Ivory.BSP.STM32.ClockConfig
 import Ivory.BSP.STM32.Driver.CAN
 import Ivory.BSP.STM32.Driver.UART
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
+import Ivory.BSP.STM32.Peripheral.CAN.Peripheral
 
 import GHC.TypeLits
 import C4D.Platforms
@@ -42,6 +43,16 @@ putHex e val = do
   ifte_ (hi >=? 0x3a) (emitV e $ hi + 7) (emitV e hi)
   ifte_ (lo >=? 0x3a) (emitV e $ lo + 7) (emitV e lo)
 
+-- leading 0 omitting version, 0f -> f
+putHex' :: (GetAlloc eff ~ 'Scope cs)
+     => Emitter ('Stored Uint8) -> Uint8 -> Ivory eff ()
+putHex' e val = do
+  let hi = (val .& 0xF0) `iShiftR` 4 + (fromIntegral $ ord '0')
+      lo = (val .& 0x0F) + (fromIntegral $ ord '0')
+
+  ifte_ (hi >=? 0x3a) (emitV e $ hi + 7) (when (hi /=? (fromIntegral $ ord '0')) $ emitV e hi)
+  ifte_ (lo >=? 0x3a) (emitV e $ lo + 7) (emitV e lo)
+
 putHexArray :: (GetAlloc (AllowBreak eff) ~ 'Scope cs,
                 IvoryExpr (ref s ('Stored Uint8)),
                 IvoryExpr (ref s ('Array len ('Stored Uint8))), IvoryRef ref,
@@ -62,8 +73,8 @@ canSend' req msg = do
       handler msg "can_msg" $ do
         abort_emitter <- emitter (abortableAbort    req) 1
         req_emitter   <- emitter (abortableTransmit req) 1
-        callback $ \msg  -> do
-          refCopy last_sent msg
+        callback $ \cmsg  -> do
+          refCopy last_sent cmsg
 
           was_pending <- deref tx_pending
           ifte_ was_pending (emitV abort_emitter true) $ do
@@ -87,6 +98,7 @@ app tocc totestcan1 totestcan2 touart toleds = do
   towerDepends uartTestTypes
   towerModule  uartTestTypes
 
+  cc <- fmap tocc getEnv
   can1  <- fmap totestcan1 getEnv
   can2  <- fmap totestcan2 getEnv
   leds <- fmap toleds getEnv
@@ -100,10 +112,10 @@ app tocc totestcan1 totestcan2 touart toleds = do
   -- UART buffer transmits in buffers. We want to transmit byte-by-byte and let
   -- this monitor manage periodically flushing a buffer.
   ostream <- uartUnbuffer (buffered_ostream :: BackpressureTransmit UARTBuffer ('Stored IBool))
-  echoPrompt "slcan" ostream istream canctl_input
+  slCANTower "slcan" ostream istream canctl_input cc can1
 
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
-  (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
+  (res2, _req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
   canSend' req canctl_output
 
@@ -121,6 +133,9 @@ app tocc totestcan1 totestcan2 touart toleds = do
     received2 <- stateInit "can2_received_count" (ival (0 :: Uint32))
 
     lastrecv <- state "lastrecv"
+
+    lastid <- state "lasteid"
+    lastida <- state "lasteida"
 
     handler res "result" $ do
       callback $ const $ do
@@ -145,30 +160,43 @@ app tocc totestcan1 totestcan2 touart toleds = do
         isRtr <- assign $ bitToBool (canid #. can_arbitration_rtr)
         cid <- assign $ canid #. can_arbitration_id
 
+        let putStdID :: (GetAlloc eff ~ 'Scope s) => Ivory eff ()
+            putStdID = do
+              i <- standardIDToArray (toRep cid)
+              i0 <- deref (i ! 0)
+              i1 <- deref (i ! 1)
+              putHex' o i0
+              putHex  o i1
+
         ifte_ isRtr
           (do
               ifte_ isExtended
                 (do
                     puts o "R"
+                    i <- extendedIDToArray (toRep cid)
+                    putHexArray o i
                 )
                 (do
                     puts o "r"
+                    putStdID
                 )
           )
           (do
               ifte_ isExtended
                 (do
                     puts o "T"
+                    store lastid $ toRep cid
+                    i <- extendedIDToArray (toRep cid)
+                    refCopy lastida i
+                    putHexArray o i
                 )
                 (do
                     puts o "t"
+                    putStdID
                 )
           )
 
         -- needs ixToUint8 or something
-        --
-        si <- extendedIDToArray (toRep cid)
-        putHexArray o si
         putc o (((bitCast :: Uint32 -> Uint8) $ signCast $ fromIx canlen) + (fromIntegral $ ord '0'))
         putHexArray o (msg ~> can_message_buf)
         puts o "\r"
@@ -190,9 +218,10 @@ toBin = proc "toBin" $ \x -> body $ do
    ]
  ret (x - (fromIntegral $ ord 'a') + 10)
 
+
 standardIDToArray :: forall s eff . (GetAlloc eff ~ 'Scope s)
                   => Uint32
-                  -> Ivory eff (ConstRef ('Stack s) (Array 2 ('Stored Uint8)))
+                  -> Ivory eff (ConstRef ('Stack s) ('Array 2 ('Stored Uint8)))
 standardIDToArray sid = do
   slb <- assign $ sid `iShiftR` 18
   l <- local $ iarray $ fmap (ival . bitCast) [ slb `iShiftR` 8, slb]
@@ -200,17 +229,19 @@ standardIDToArray sid = do
 
 extendedIDToArray :: forall s eff . (GetAlloc eff ~ 'Scope s)
                   => Uint32
-                  -> Ivory eff (ConstRef ('Stack s) (Array 4 ('Stored Uint8)))
+                  -> Ivory eff (ConstRef ('Stack s) ('Array 4 ('Stored Uint8)))
 extendedIDToArray eid = do
-  l <- local $ iarray $ fmap (ival . bitCast) [ eid `iShiftR` 8*i | i <- [3,2,1,0]]
+  l <- local $ iarray $ fmap (ival . bitCast) [ eid `iShiftR` (8*i) | i <- [3,2,1,0]]
   return $ constRef l
 
-echoPrompt :: String
+slCANTower :: String
            -> ChanInput  ('Stored Uint8)
            -> ChanOutput ('Stored Uint8)
            -> ChanInput  ('Struct "can_message")
+           -> ClockConfig
+           -> TestCAN
            -> Tower p ()
-echoPrompt greeting ostream istream canctl = do
+slCANTower greeting ostream istream canctl cc can = do
   towerDepends canDriverTypes
   towerModule  canDriverTypes
 
@@ -218,9 +249,7 @@ echoPrompt greeting ostream istream canctl = do
   towerModule  slcanTypes
   p <- period (Milliseconds 1)
 
-
   monitor "echoprompt" $ do
-    (incoming :: Ref 'Global UARTBuffer) <- state "incoming"
     initialized <- stateInit "initialized" (ival false)
 
     rtr <- stateInit "rtr" (ival false)
@@ -229,6 +258,7 @@ echoPrompt greeting ostream istream canctl = do
     dlc <- stateInit "dlc" (ival (0 :: Uint8))
     expectDlc <- stateInit "expectDlc" (ival (0 :: Uint8))
     canid <- stateInit "canid" (ival (0 :: Uint32))
+    canspeed <- stateInit "canspeed" (ival (0 :: Uint8))
 
     canframe <- state "canframe"
 
@@ -237,11 +267,14 @@ echoPrompt greeting ostream istream canctl = do
     transDLC <- stateInit "transDLC" (ival false)
     transData <- stateInit "transData" (ival false)
     transDone <- stateInit "transDone" (ival false)
+    transSpeed <- stateInit "transSpeed" (ival false)
     transEOF <- stateInit "transEOF" (ival false)
     initParseFail <- stateInit "initParseFail" (ival false)
 
-    failchar <- state "failchar"
+    failcount <- stateInit "failcount" (ival (0 :: Uint32))
     halfinput <- state "halfinput"
+    failchar <- state "failchar"
+    ignore <- stateInit "ignore" (ival false)
 
     handler p "init" $ do
       o <- emitter ostream 32
@@ -253,23 +286,23 @@ echoPrompt greeting ostream istream canctl = do
 
     handler istream "istream" $ do
       c <- emitter canctl 1
-      o <- emitter ostream 32
       callbackV $ \input -> do
-        --putc o input -- echo to terminal
         let testChar = (input `isChar`)
-
-        pos <- deref (incoming ~> stringLengthL)
 
         tinit <- deref (transInit)
         tid <- deref (transID)
         tdlc <- deref (transDLC)
         tdata <- deref (transData)
         teof <- deref (transEOF)
-
+        tspeed <- deref (transSpeed)
 
         when tinit $ do
           emptyframe <- local $ istruct []
           refCopy canframe emptyframe
+
+          store ignore false
+          store initParseFail false
+
           cond_
             [ testChar 'T' ==> do
                 store rtr false
@@ -283,30 +316,63 @@ echoPrompt greeting ostream istream canctl = do
             , testChar 'r' ==> do
                 store rtr true
                 store ext false
-            -- , testChar 'S' ==> do -- can speed
+            , testChar 'S' ==> do -- can speed
+                store transInit false
+                store transSpeed true
+            -- open/close
+            , testChar 'o' ==> store ignore true
+            , testChar 'O' ==> store ignore true
+            , testChar 'c' ==> store ignore true
+            , testChar 'C' ==> store ignore true
+            , testChar '\r' ==> store ignore true
             , true ==> do
                 store initParseFail true
-                -- XXX: not needed, store failcount here
-                store failchar input
+                fc <- deref failcount
+                when (fc ==? 0) $ store failchar input
+                failcount %= (+1)
             ]
 
           pfailed <- deref initParseFail
-          unless pfailed $ do
+          ig <- deref ignore
+          ts <- deref transSpeed
+          -- unless this is ignored byte, speed config or parsing failure
+          -- transition to id parsing
+          unless (ig .|| ts .|| pfailed) $ do
+            isExt <- deref ext
+            ifte_ isExt (store idcnt 8) (store idcnt 3)
+
             store transInit false
             store transID true
 
-          isExt <- deref ext
-          ifte_ isExt (store idcnt 8) (store idcnt 3)
+        when tspeed $ do
+          binInput <- call toBin input
+          store canspeed binInput
+          let canReinit baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
+
+          cond_ [ testChar '0' ==> canReinit 10000
+                , testChar '1' ==> canReinit 20000
+                , testChar '2' ==> canReinit 50000
+                , testChar '3' ==> canReinit 100000
+                , testChar '4' ==> canReinit 125000
+                , testChar '5' ==> canReinit 250000
+                , testChar '6' ==> canReinit 500000
+                --, testChar '7' ==> canReinit 800000 --XXX: won't pass legal timings test
+                , testChar '8' ==> canReinit 1000000
+                , true         ==> canReinit 1000000
+                ]
+
+          store transSpeed false
+          store transInit true
 
         when tid $ do
-          cc <- deref canid
+          cid <- deref canid
           binInput <- call toBin input
-          store canid $ (cc `iShiftL` 4) + (safeCast binInput)
+          store canid $ (cid `iShiftL` 4) + (safeCast binInput)
 
           pid <- deref idcnt
           store idcnt (pid - 1)
-          cid <- deref idcnt
-          when (cid ==? 0) $ do
+          ccid <- deref idcnt
+          when (ccid ==? 0) $ do
             store transID false
             store transDLC true
 
