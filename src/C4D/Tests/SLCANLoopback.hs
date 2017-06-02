@@ -115,11 +115,9 @@ app tocc totestcan1 totestcan2 touart toleds = do
   slCANTower "slcan" ostream istream canctl_input cc can1
 
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
+  (res2, _req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
-  res' <- toggleOnChanTower res (blueLED leds)
-  canctl_output' <- toggleOnChanTower canctl_output (redLED leds)
-
-  canSend' req canctl_output'
+  canSend' req canctl_output
 
   monitor "simplecontroller" $ do
     handler systemInit "init" $ do
@@ -132,22 +130,28 @@ app tocc totestcan1 totestcan2 touart toleds = do
         ledSetup $ blueLED leds
 
     received <- stateInit "can_received_count" (ival (0 :: Uint32))
+    received2 <- stateInit "can2_received_count" (ival (0 :: Uint32))
 
     lastrecv <- state "lastrecv"
 
     lastid <- state "lasteid"
     lastida <- state "lasteida"
 
-    handler res' "result" $ do
-      o <- emitter ostream 32
-      callback $ \msg -> do
+    handler res "result" $ do
+      callback $ const $ do
         count <- deref received
         store received (count + 1)
         ifte_ (count .& 1 ==? 1)
           (ledOff $ redLED leds)
           (ledOn  $ redLED leds)
 
+    handler res2 "result2" $ do
+      o <- emitter ostream 64
+      callback $ \msg -> do
+        count <- deref received2
+
         refCopy lastrecv msg
+        store received2 (count + 1)
 
         canid <- msg ~>* can_message_id
         canlen <- msg ~>* can_message_len
@@ -197,29 +201,9 @@ app tocc totestcan1 totestcan2 touart toleds = do
         putHexArray o (msg ~> can_message_buf)
         puts o "\r"
 
-
--- toggle LED on each channel message
-toggleOnChanTower :: (IvoryZero a, IvoryArea a)
-                 => ChanOutput a
-                 -> LED
-                 -> Tower e (ChanOutput a)
-toggleOnChanTower chan_out led = do
-  (c_in, c_out) <- channel
-
-  monitor "blink_on_chan" $ do
-    count <- stateInit "blink_on_chan_count" (ival (0 :: Uint32))
-    handler chan_out "blink_on_chan_handle" $ do
-      cine <- emitter c_in 1
-      callback $ \msg -> do
-        cnt <- deref count
-        ifte_ (cnt .& 1 ==? 1)
-          (ledOff led)
-          (ledOn  led)
-
-        count %= (+1)
-        emit cine msg
-
-  return c_out
+        ifte_ (count .& 1 ==? 1)
+          (ledOff $ blueLED leds)
+          (ledOn  $ blueLED leds)
 
 -- http://elixir.free-electrons.com/linux/v4.11.3/source/drivers/net/can/slcan.c
 

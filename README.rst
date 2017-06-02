@@ -36,11 +36,13 @@ CANLoop
 CAN2UART
   can2uart bridge
   Image available in build/can2uart-test/image
-SLCAN
+SLCANLoopback
   SLCAN loopback test. Connect CAN1 to CAN2 create loopback
   for SLCAN. SLCAN messages sent to UART2 will flow thru CAN1->CAN2 back to UART2,
   see SLCAN usage for more information.
   Image available in build/slcan-test/image
+SLCAN
+  Standalone UART2 <-> CAN1 bridge
 
 Flashing
 --------
