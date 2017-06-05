@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module C4D.Tests.SLCAN where
+module C4D.Tests.SLCANLoopback where
 
 import Data.Char (ord)
 
