@@ -14,6 +14,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     C4D.Platforms
+                       C4D.Types
                        C4D.Tests.CANSendRecv
                        C4D.Tests.CANLoop
                        C4D.Tests.CAN2UART
@@ -30,7 +31,8 @@ library
                        tower-hal,
                        tower-freertos-stm32 >= 0.9,
                        ivory-bsp-stm32,
-                       ivory-bsp-tests
+                       ivory-bsp-tests,
+                       ivory-tower-base
 
   default-language:    Haskell2010
   ghc-options:         -Wall

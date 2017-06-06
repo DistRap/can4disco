@@ -14,9 +14,12 @@ import Ivory.BSP.STM32.ClockConfig
 import Ivory.BSP.STM32.Driver.CAN
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
 
-import C4D.Platforms
-import BSP.Tests.LED
+import Ivory.Tower.Base
 
+import C4D.Platforms
+
+canSend :: AbortableTransmit ('Struct "can_message") ('Stored IBool)
+        -> Tower e ()
 canSend req = do
     periodic <- period (Milliseconds 500)
 
@@ -64,8 +67,6 @@ app tocc totestcan1 totestcan2 toleds = do
 
   (res, req, _, _) <- canTower tocc (testCAN can1)   1000000 (testCANRX can1) (testCANTX can1)
   (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
-
-  periodic <- period (Milliseconds 250)
 
   canSend req
   canSend req2

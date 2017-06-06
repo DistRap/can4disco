@@ -19,43 +19,10 @@ import Ivory.BSP.STM32.Driver.CAN
 import Ivory.BSP.STM32.Driver.UART
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
 
+import Ivory.Tower.Base
+
 import C4D.Platforms
-import BSP.Tests.LED
-import BSP.Tests.UART.Buffer
-import BSP.Tests.UART.Types
-
-puts :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> String -> Ivory eff ()
-puts e str = mapM_ (\c -> putc e (fromIntegral (ord c))) str
-
-putc :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> Uint8 -> Ivory eff ()
-putc = emitV
-
-canSend' :: AbortableTransmit ('Struct "can_message") ('Stored IBool)
-         -> ChanOutput  ('Struct "can_message") -- ('Array 8 ('Stored Uint8)))
-         -> Tower p ()
-canSend' req msg = do
-    monitor "canSender" $ do
-      tx_pending <- state "tx_pending"
-      last_sent  <- state "last_sent"
-      handler msg "can_msg" $ do
-        abort_emitter <- emitter (abortableAbort    req) 1
-        req_emitter   <- emitter (abortableTransmit req) 1
-        callback $ \msg  -> do
-          refCopy last_sent msg
-
-          was_pending <- deref tx_pending
-          ifte_ was_pending (emitV abort_emitter true) $ do
-            emit req_emitter $ constRef last_sent
-            store tx_pending true
-
-      handler (abortableComplete req) "tx_complete" $ do
-        req_emitter <- emitter (abortableTransmit req) 1
-        callbackV $ \ ok -> do
-          ifte_ ok (store tx_pending false) $ do
-            emit req_emitter $ constRef last_sent
-            store tx_pending true
+import C4D.Types
 
 app :: (e -> ClockConfig)
     -> (e -> TestCAN)
@@ -64,8 +31,7 @@ app :: (e -> ClockConfig)
     -> (e -> ColoredLEDs)
     -> Tower e ()
 app tocc totestcan1 totestcan2 touart toleds = do
-  towerDepends uartTestTypes
-  towerModule  uartTestTypes
+  c4dTowerDeps
 
   can1  <- fmap totestcan1 getEnv
   can2  <- fmap totestcan2 getEnv
@@ -74,18 +40,13 @@ app tocc totestcan1 totestcan2 touart toleds = do
 
   (canctl_input, canctl_output) <- channel
 
-  (buffered_ostream, istream, mon) <- uartTower tocc (testUARTPeriph uart) (testUARTPins uart) 115200
-
-  monitor "dma" mon
-  -- UART buffer transmits in buffers. We want to transmit byte-by-byte and let
-  -- this monitor manage periodically flushing a buffer.
-  ostream <- uartUnbuffer (buffered_ostream :: BackpressureTransmit UARTBuffer ('Stored IBool))
+  (ostream, istream) <- bufferedUartTower tocc (testUARTPeriph uart) (testUARTPins uart) 115200 (Proxy :: Proxy UARTBuffer)
   echoPrompt "hello world" ostream istream canctl_input
 
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
-  (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
+  (res2, _req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
-  canSend' req canctl_output
+  canSendTower req canctl_output
 
   monitor "simplecontroller" $ do
     handler systemInit "init" $ do
@@ -111,13 +72,10 @@ app tocc totestcan1 totestcan2 touart toleds = do
     handler res2 "result2" $ do
       o <- emitter ostream 64
       callback $ \msg -> do
-        --(ledOn  $ blueLED leds)
         count <- deref received2
         store received2 (count + 1)
         puts o "\n\rrcv\n\r"
-        -- l <- deref (msg ~> can_message_len)
         arrayMap $ \ix -> do
-            --when (fromIx ix <? 8) $ do
               val <- deref ((msg ~> can_message_buf) ! ix)
               putc o (48 + (castWith 0 $ fromIx $ ix))
               putc o val
@@ -164,7 +122,6 @@ echoPrompt greeting ostream istream canctl = do
       callbackV $ \input -> do
         putc o input -- echo to terminal
         push input
-        let testChar = (input `isChar`)
         pos <- deref (incoming ~> stringLengthL)
         when (pos ==? 8) $ do
 
@@ -179,10 +136,3 @@ echoPrompt greeting ostream istream canctl = do
           store (incoming ~> stringLengthL) 0
 
   where prompt = "tower> "
-
-isChar :: Uint8 -> Char -> IBool
-isChar b c = b ==? (fromIntegral $ ord c)
-
-uartTestTypes :: Module
-uartTestTypes = package "uartTestTypes" $ do
-  defStringType (Proxy :: Proxy UARTBuffer)

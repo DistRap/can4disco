@@ -20,73 +20,10 @@ import Ivory.BSP.STM32.Driver.UART
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
 import Ivory.BSP.STM32.Peripheral.CAN.Peripheral
 
-import GHC.TypeLits
+import Ivory.Tower.Base
+
 import C4D.Platforms
-import BSP.Tests.LED
-import BSP.Tests.UART.Buffer
-import BSP.Tests.UART.Types
-
-puts :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> String -> Ivory eff ()
-puts e str = mapM_ (\c -> putc e (fromIntegral (ord c))) str
-
-putc :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> Uint8 -> Ivory eff ()
-putc = emitV
-
-putHex :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> Uint8 -> Ivory eff ()
-putHex e val = do
-  let hi = (val .& 0xF0) `iShiftR` 4 + (fromIntegral $ ord '0')
-      lo = (val .& 0x0F) + (fromIntegral $ ord '0')
-
-  ifte_ (hi >=? 0x3a) (emitV e $ hi + 7) (emitV e hi)
-  ifte_ (lo >=? 0x3a) (emitV e $ lo + 7) (emitV e lo)
-
--- leading 0 omitting version, 0f -> f
-putHex' :: (GetAlloc eff ~ 'Scope cs)
-     => Emitter ('Stored Uint8) -> Uint8 -> Ivory eff ()
-putHex' e val = do
-  let hi = (val .& 0xF0) `iShiftR` 4 + (fromIntegral $ ord '0')
-      lo = (val .& 0x0F) + (fromIntegral $ ord '0')
-
-  ifte_ (hi >=? 0x3a) (emitV e $ hi + 7) (when (hi /=? (fromIntegral $ ord '0')) $ emitV e hi)
-  ifte_ (lo >=? 0x3a) (emitV e $ lo + 7) (emitV e lo)
-
-putHexArray :: (GetAlloc (AllowBreak eff) ~ 'Scope cs,
-                IvoryExpr (ref s ('Stored Uint8)),
-                IvoryExpr (ref s ('Array len ('Stored Uint8))), IvoryRef ref,
-                GHC.TypeLits.KnownNat len) =>
-               Emitter ('Stored Uint8)
-               -> ref s ('Array len ('Stored Uint8)) -> Ivory eff ()
-putHexArray e a = arrayMap $ \i -> do
-  x <- deref (a ! i)
-  putHex e x
-
-canSend' :: AbortableTransmit ('Struct "can_message") ('Stored IBool)
-         -> ChanOutput  ('Struct "can_message") -- ('Array 8 ('Stored Uint8)))
-         -> Tower p ()
-canSend' req msg = do
-    monitor "canSender" $ do
-      tx_pending <- state "tx_pending"
-      last_sent  <- state "last_sent"
-      handler msg "can_msg" $ do
-        abort_emitter <- emitter (abortableAbort    req) 1
-        req_emitter   <- emitter (abortableTransmit req) 1
-        callback $ \cmsg  -> do
-          refCopy last_sent cmsg
-
-          was_pending <- deref tx_pending
-          ifte_ was_pending (emitV abort_emitter true) $ do
-            emit req_emitter $ constRef last_sent
-            store tx_pending true
-
-      handler (abortableComplete req) "tx_complete" $ do
-        req_emitter <- emitter (abortableTransmit req) 1
-        callbackV $ \ ok -> do
-          ifte_ ok (store tx_pending false) $ do
-            emit req_emitter $ constRef last_sent
-            store tx_pending true
+import C4D.Types
 
 app :: (e -> ClockConfig)
     -> (e -> TestCAN)
@@ -95,8 +32,7 @@ app :: (e -> ClockConfig)
     -> (e -> ColoredLEDs)
     -> Tower e ()
 app tocc totestcan1 totestcan2 touart toleds = do
-  towerDepends uartTestTypes
-  towerModule  uartTestTypes
+  c4dTowerDeps
 
   cc <- fmap tocc getEnv
   can1  <- fmap totestcan1 getEnv
@@ -117,7 +53,7 @@ app tocc totestcan1 totestcan2 touart toleds = do
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
   (res2, _req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
 
-  canSend' req canctl_output
+  canSendTower req canctl_output
 
   monitor "simplecontroller" $ do
     handler systemInit "init" $ do
@@ -207,32 +143,6 @@ app tocc totestcan1 totestcan2 touart toleds = do
 
 -- http://elixir.free-electrons.com/linux/v4.11.3/source/drivers/net/can/slcan.c
 
--- from ASCII rep to binary
-toBin :: Def ('[Uint8] ':-> Uint8)
-toBin = proc "toBin" $ \x -> body $ do
- cond_
-   [ x >=? (fromIntegral $ ord '0') .&& x <=? (fromIntegral $ ord '9') ==> do
-       ret (x - (fromIntegral $ ord '0'))
-   , x >=? (fromIntegral $ ord 'A') .&& x <=? (fromIntegral $ ord 'F') ==> do
-       ret (x - (fromIntegral $ ord 'A') + 10)
-   ]
- ret (x - (fromIntegral $ ord 'a') + 10)
-
-
-standardIDToArray :: forall s eff . (GetAlloc eff ~ 'Scope s)
-                  => Uint32
-                  -> Ivory eff (ConstRef ('Stack s) ('Array 2 ('Stored Uint8)))
-standardIDToArray sid = do
-  slb <- assign $ sid `iShiftR` 18
-  l <- local $ iarray $ fmap (ival . bitCast) [ slb `iShiftR` 8, slb]
-  return $ constRef l
-
-extendedIDToArray :: forall s eff . (GetAlloc eff ~ 'Scope s)
-                  => Uint32
-                  -> Ivory eff (ConstRef ('Stack s) ('Array 4 ('Stored Uint8)))
-extendedIDToArray eid = do
-  l <- local $ iarray $ fmap (ival . bitCast) [ eid `iShiftR` (8*i) | i <- [3,2,1,0]]
-  return $ constRef l
 
 slCANTower :: String
            -> ChanInput  ('Stored Uint8)
@@ -245,8 +155,8 @@ slCANTower greeting ostream istream canctl cc can = do
   towerDepends canDriverTypes
   towerModule  canDriverTypes
 
-  towerDepends slcanTypes
-  towerModule  slcanTypes
+  towerDepends basecanTypes
+  towerModule  basecanTypes
   p <- period (Milliseconds 1)
 
   monitor "echoprompt" $ do
@@ -441,14 +351,3 @@ slCANTower greeting ostream istream canctl cc can = do
 
           store transDone false
           store transInit true
-
-isChar :: Uint8 -> Char -> IBool
-isChar b c = b ==? (fromIntegral $ ord c)
-
-uartTestTypes :: Module
-uartTestTypes = package "uartTestTypes" $ do
-  defStringType (Proxy :: Proxy UARTBuffer)
-
-slcanTypes :: Module
-slcanTypes = package "slcanTypes" $ do
-  incl toBin
