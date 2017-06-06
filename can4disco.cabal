@@ -14,6 +14,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     C4D.Platforms
+                       C4D.SLCAN
                        C4D.Types
                        C4D.Tests.CANSendRecv
                        C4D.Tests.CANLoop
