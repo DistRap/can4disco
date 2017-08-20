@@ -6,17 +6,13 @@
 
 module C4D.Tests.CAN2UART where
 
-import Data.Char (ord)
-
 import Ivory.Language
 import Ivory.Stdlib
 import Ivory.Tower
 import Ivory.Tower.HAL.Bus.CAN
-import Ivory.Tower.HAL.Bus.Interface
 
 import Ivory.BSP.STM32.ClockConfig
 import Ivory.BSP.STM32.Driver.CAN
-import Ivory.BSP.STM32.Driver.UART
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
 
 import Ivory.Tower.Base

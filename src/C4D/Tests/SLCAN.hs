@@ -7,9 +7,7 @@
 module C4D.Tests.SLCAN where
 
 import Ivory.Language
-import Ivory.Stdlib
 import Ivory.Tower
-import Ivory.Tower.HAL.Bus.CAN
 
 import Ivory.BSP.STM32.ClockConfig
 import Ivory.BSP.STM32.Driver.CAN
