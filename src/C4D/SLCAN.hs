@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
 
 module C4D.SLCAN where
 
@@ -11,21 +12,25 @@ import Ivory.Tower
 import Ivory.Tower.Base
 import Ivory.Tower.HAL.Bus.CAN
 
-import Ivory.BSP.STM32.ClockConfig
-import Ivory.BSP.STM32.Peripheral.CAN.Peripheral
-
-import C4D.Platforms
-
 -- http://elixir.free-electrons.com/linux/v4.11.3/source/drivers/net/can/slcan.c
 
+-- serial line CAN interface driver (SLCAN)
+-- basically UART -> CAN -> UART bridge
+-- supported in kernel via slcand
+--
+-- canReinit function is abstracted out so this can run on posix as well
+--
+-- Pass your own reinit function e.g.:
+--   let canReinit baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
+--
+-- Use slCANTowerSimple on posix
 slCANTower :: ChanInput  ('Stored Uint8)
            -> ChanOutput ('Stored Uint8)
            -> ChanInput  ('Struct "can_message")
            -> ChanOutput ('Struct "can_message")
-           -> ClockConfig
-           -> TestCAN
+           -> (forall s eff . (GetAlloc eff ~ 'Scope s,  'Break ~ GetBreaks (AllowBreak eff)) => Integer -> Ivory eff ())
            -> Tower p ()
-slCANTower ostream istream canctl canres cc can = do
+slCANTower ostream istream canctl canres canReinit = do
   towerDepends canDriverTypes
   towerModule  canDriverTypes
 
@@ -122,7 +127,6 @@ slCANTower ostream istream canctl canres cc can = do
         when tspeed $ do
           binInput <- call toBin input
           store canspeed binInput
-          let canReinit baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
 
           cond_ [ testChar '0' ==> canReinit 10000
                 , testChar '1' ==> canReinit 20000
@@ -278,3 +282,11 @@ slCANTower ostream istream canctl canres cc can = do
         putc o (((bitCast :: Uint32 -> Uint8) $ signCast $ fromIx canlen) + (fromIntegral $ ord '0'))
         putHexArray o (msg ~> can_message_buf)
         puts o "\r"
+
+slCANTowerSimple :: ChanInput  ('Stored Uint8)
+                 -> ChanOutput ('Stored Uint8)
+                 -> ChanInput  ('Struct "can_message")
+                 -> ChanOutput ('Struct "can_message")
+                 -> Tower p ()
+slCANTowerSimple ostream istream canctl canres =
+  slCANTower ostream istream canctl canres (const (return ()))

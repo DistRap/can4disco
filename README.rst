@@ -76,12 +76,40 @@ To send raw messages to can4disco::
 
 To fake UART for `slcand` use::
 
-  socat -d -d pty,link=/dev/ttyS0,raw,echo=0 pty,link=/dev/ttyS1,raw,echo=0
+  sudo socat -d -d pty,link=/dev/ttyS0,raw,echo=0 pty,link=/dev/ttyS1,raw,echo=0
 
 run screen on one side::
 
-  screen /dev/ttyS1 115200
+  sudo screen /dev/ttyS1 115200
 
 and point slcand to it::
 
-  slcand -F -s8 -S115200 /dev/ttyS0 can0
+  sudo slcand -F -s8 -S115200 /dev/ttyS0 can0
+
+Running SLCAN POSIX Loopback
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It is possible to run `slCANTower` on POSIX with the help of `ivory-tower-posix`.
+
+Build the executable with::
+
+  make slcan-posix-loopback-test
+
+Link `ttyS0` and `ttyS1`::
+
+  sudo socat -d -d pty,link=/dev/ttyS0,raw,echo=0 pty,link=/dev/ttyS1,raw,echo=0
+
+run `tower_init` on one side::
+
+  sudo ./build/slcan-posix-loopback-test/tower_init <> /dev/ttyS1 > /dev/ttyS1
+
+and `slcand` on the other side::
+
+  sudo slcand -F -s8 -S115200 /dev/ttyS0 can0
+  sudo ip link set can0 up
+
+Try dumping and sending some data, your messages should appear twice as
+there is an loopback in `tower_init`::
+
+  candump can0
+  cansend can0 000#0201

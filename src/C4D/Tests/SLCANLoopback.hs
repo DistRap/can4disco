@@ -51,7 +51,7 @@ app tocc totestcan1 totestcan2 touart toleds = do
   -- CAN RX + LED
   res2' <- toggleOnChanTower res2 (blueLED leds)
 
-  slCANTower ostream istream canctl_input res2' cc can1
+  slCANTower ostream istream canctl_input res2' (canReinit cc can1)
 
   -- CAN TX + LED
   canctl_output' <- toggleOnChanTower canctl_output (redLED leds)
@@ -67,3 +67,5 @@ app tocc totestcan1 totestcan2 touart toleds = do
                       [CANFilterBank CANFIFO1 CANFilterMask $ CANFilter32 emptyID emptyID]
         ledSetup $ redLED leds
         ledSetup $ blueLED leds
+
+  where canReinit cc can baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
