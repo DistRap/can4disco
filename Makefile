@@ -1,6 +1,6 @@
 #include ../stack.mk
 
-TARGET ?= /dev/f4gdb
+TARGET ?= /dev/can4disco-gdb
 IVORYFLAGS ?= --const-fold --verbose
 TESTS      := \
 	cansendrecv-test \

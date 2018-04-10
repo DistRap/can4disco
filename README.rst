@@ -60,7 +60,7 @@ UART<->CAN bridge with Linux kernel use::
   modprobe can
   modprobe can-raw
   modprobe slcan
-  slcand -F -s8 -S115200 /dev/f4uart can0 # CAN speed 8 -> 1Mbit
+  slcand -F -s8 -S115200 /dev/can4disco-uart can0 # CAN speed 8 -> 1Mbit
   ip link set can0 up
   candump can0
   cansend can0 1F334455#112233445566778
@@ -77,8 +77,8 @@ Debugging SLCAN
 
 To send raw messages to can4disco::
 
-  echo -n -e 'TFF3344558DEADBEEFAABBCCDD\r' > /dev/f4uart
-  echo -n -e 't1234DEADBEEF\r' > /dev/f4uart
+  echo -n -e 'TFF3344558DEADBEEFAABBCCDD\r' > /dev/can4disco-uart
+  echo -n -e 't1234DEADBEEF\r' > /dev/can4disco-uart
 
 To fake UART for `slcand` use::
 
