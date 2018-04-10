@@ -15,6 +15,10 @@ module C4D.Platforms
   , TestPlatform(..)
   , testplatform_clockconfig
   , can4disco
+  , can1txLED
+  , can1rxLED
+  , can2txLED
+  , can2rxLED
   ) where
 
 import Ivory.Tower.Config
@@ -134,3 +138,12 @@ can4disco = TestPlatform
   , testplatform_rng = F405.rng
   , testplatform_stm32 = stm32f405Defaults 8
   }
+
+
+can1txLED, can1rxLED :: LED
+can1txLED  = LED F405.pinC8 ActiveHigh
+can1rxLED  = LED F405.pinC6 ActiveHigh
+
+can2txLED, can2rxLED :: LED
+can2txLED  = LED F405.pinE8 ActiveHigh
+can2rxLED  = LED F405.pinE10 ActiveHigh

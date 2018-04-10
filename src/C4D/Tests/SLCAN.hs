@@ -34,6 +34,8 @@ app tocc totestcan1 touart toleds = do
   leds <- fmap toleds getEnv
   uart <- fmap touart getEnv
 
+  blink (Milliseconds 666) [redLED leds]
+
   (canctl_input, canctl_output) <- channel
 
   (ostream, istream) <- bufferedUartTower tocc (testUARTPeriph uart) (testUARTPins uart) 115200 (Proxy :: Proxy UARTBuffer)
@@ -41,12 +43,12 @@ app tocc totestcan1 touart toleds = do
   (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
 
   -- CAN RX + LED
-  res' <- toggleOnChanTower res (blueLED leds)
+  res' <- toggleOnChanTower res can1rxLED
 
   slCANTower ostream istream canctl_input res' (canReinit cc can1)
 
   -- CAN TX + LED
-  canctl_output' <- toggleOnChanTower canctl_output (redLED leds)
+  canctl_output' <- toggleOnChanTower canctl_output can1txLED
 
   canSendTower req canctl_output'
 
@@ -57,7 +59,7 @@ app tocc totestcan1 touart toleds = do
         canFilterInit (testCANFilters can1)
                       [CANFilterBank CANFIFO0 CANFilterMask $ CANFilter32 emptyID emptyID]
                       [CANFilterBank CANFIFO1 CANFilterMask $ CANFilter32 emptyID emptyID]
-        ledSetup $ redLED leds
-        ledSetup $ blueLED leds
+        ledSetup $ can1txLED
+        ledSetup $ can1rxLED
 
   where canReinit cc can baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
