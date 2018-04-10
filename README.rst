@@ -119,3 +119,13 @@ there is an loopback in `tower_init`::
 
   candump can0
   cansend can0 000#0201
+
+Testing hardware
+----------------
+
+Load loopback firmware::
+
+  make canloop
+
+Connect `CAN1 L` to `CAN2 L` and `CAN1 H` to `CAN2 H` to create a hardware loopback, after bridging
+both transcievers `RX/TX` `LEDs` should start blinking indicating reception on both interfaces.
