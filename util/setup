@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+sudo modprobe can
+sudo modprobe can-raw
+sudo modprobe slcan
+
+sudo killall slcand &> /dev/null
+
+sudo slcand -F -s8 -S115200 /dev/can4disco-uart can0 &
+
+sleep 1
+
+sudo ip link set can0 up
+echo "Setup done, starting candump"
+candump can0

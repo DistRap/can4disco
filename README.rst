@@ -66,6 +66,12 @@ UART<->CAN bridge with Linux kernel use::
   cansend can0 1F334455#112233445566778
   cansend can0 1EF#11223344556677FF
 
+You can also use::
+
+  make slcan-setup
+
+to execute `./util/setup` script (runs commands above, requires sudo).
+
 Debugging SLCAN
 ~~~~~~~~~~~~~~~
 

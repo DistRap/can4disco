@@ -23,6 +23,9 @@ GDB := arm-none-eabi-gdb \
 test: $(TESTS) $(AADL_TESTS)
 clean: $(CLEANS)
 
+slcan-setup:
+	./util/setup
+
 define MKTEST
 $(1):
 	stack build . --exec '$(1)-gen --src-dir=build/$(1) $(IVORYFLAGS)'
