@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module C4D.Tests.CANLoop where
 
@@ -56,17 +57,15 @@ canSend req = do
             store tx_pending true
 
 app :: (e -> ClockConfig)
-    -> (e -> TestCAN)
-    -> (e -> TestCAN)
-    -> (e -> ColoredLEDs)
+    -> (e -> C4DPlatform)
     -> Tower e ()
-app tocc totestcan1 totestcan2 toleds = do
-  can1  <- fmap totestcan1 getEnv
-  can2  <- fmap totestcan2 getEnv
-  leds <- fmap toleds    getEnv
+app tocc toPlatform = do
+  C4DPlatform{..} <- fmap toPlatform getEnv
+  let redLED = platformRedLED $ basePlatform
+      greenLED = platformGreenLED $ basePlatform
 
-  (res, req, _, _) <- canTower tocc (testCAN can1)   1000000 (testCANRX can1) (testCANTX can1)
-  (res2, req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
+  (res, req, _, _) <- canTower tocc (canPeriph can1)   1000000 (canRxPin can1) (canTxPin can1)
+  (res2, req2, _, _) <- canTower tocc (canPeriph can2) 1000000 (canRxPin can2) (canTxPin can2)
 
   canSend req
   canSend req2
@@ -75,11 +74,11 @@ app tocc totestcan1 totestcan2 toleds = do
     handler systemInit "init" $ do
       callback $ const $ do
         let emptyID = CANFilterID32 (fromRep 0) (fromRep 0) False False
-        canFilterInit (testCANFilters can1)
+        canFilterInit (canPeriphFilters can1)
                       [CANFilterBank CANFIFO0 CANFilterMask $ CANFilter32 emptyID emptyID]
                       [CANFilterBank CANFIFO1 CANFilterMask $ CANFilter32 emptyID emptyID]
-        ledSetup $ redLED leds
-        ledSetup $ blueLED leds
+        ledSetup redLED
+        ledSetup greenLED
 
     received <- stateInit "can_received_count" (ival (0 :: Uint32))
     received2 <- stateInit "can2_received_count" (ival (0 :: Uint32))
@@ -89,13 +88,13 @@ app tocc totestcan1 totestcan2 toleds = do
         count <- deref received
         store received (count + 1)
         ifte_ (count .& 1 ==? 0)
-          (ledOff $ redLED leds)
-          (ledOn  $ redLED leds)
+          (ledOff redLED)
+          (ledOn  redLED)
 
     handler res2 "result2" $ do
       callback $ const $ do
         count <- deref received2
         store received2 (count + 1)
         ifte_ (count .& 1 ==? 0)
-          (ledOff $ blueLED leds)
-          (ledOn  $ blueLED leds)
+          (ledOff greenLED)
+          (ledOn  greenLED)

@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module C4D.Tests.CAN2UART where
 
@@ -15,32 +16,28 @@ import Ivory.BSP.STM32.ClockConfig
 import Ivory.BSP.STM32.Driver.CAN
 import Ivory.BSP.STM32.Peripheral.CAN.Filter
 
-import Ivory.Tower.Base
+import Ivory.Tower.Base hiding (echoPrompt)
 
 import C4D.Platforms
 import C4D.Types
 
 app :: (e -> ClockConfig)
-    -> (e -> TestCAN)
-    -> (e -> TestCAN)
-    -> (e -> TestUART)
-    -> (e -> ColoredLEDs)
+    -> (e -> C4DPlatform)
     -> Tower e ()
-app tocc totestcan1 totestcan2 touart toleds = do
-  c4dTowerDeps
+app tocc toPlatform = do
+  C4DPlatform{..} <- fmap toPlatform getEnv
+  let redLED = platformRedLED $ basePlatform
+      greenLED = platformGreenLED $ basePlatform
 
-  can1  <- fmap totestcan1 getEnv
-  can2  <- fmap totestcan2 getEnv
-  leds <- fmap toleds getEnv
-  uart <- fmap touart getEnv
+  c4dTowerDeps
 
   (canctl_input, canctl_output) <- channel
 
-  (ostream, istream) <- bufferedUartTower tocc (testUARTPeriph uart) (testUARTPins uart) 115200 (Proxy :: Proxy UARTBuffer)
+  (ostream, istream) <- bufferedUartTower tocc (platformUART basePlatform) (platformUARTPins basePlatform) 115200 (Proxy :: Proxy UARTBuffer)
   echoPrompt "hello world" ostream istream canctl_input
 
-  (res, req, _, _) <- canTower tocc (testCAN can1) 1000000 (testCANRX can1) (testCANTX can1)
-  (res2, _req2, _, _) <- canTower tocc (testCAN can2) 1000000 (testCANRX can2) (testCANTX can2)
+  (res, req, _, _) <- canTower tocc (canPeriph can1) 1000000 (canRxPin can1) (canTxPin can1)
+  (res2, _req2, _, _) <- canTower tocc (canPeriph can2) 1000000 (canRxPin can2) (canTxPin can2)
 
   canSendTower req canctl_output
 
@@ -48,11 +45,11 @@ app tocc totestcan1 totestcan2 touart toleds = do
     handler systemInit "init" $ do
       callback $ const $ do
         let emptyID = CANFilterID32 (fromRep 0) (fromRep 0) False False
-        canFilterInit (testCANFilters can1)
+        canFilterInit (canPeriphFilters can1)
                       [CANFilterBank CANFIFO0 CANFilterMask $ CANFilter32 emptyID emptyID]
                       [CANFilterBank CANFIFO1 CANFilterMask $ CANFilter32 emptyID emptyID]
-        ledSetup $ redLED leds
-        ledSetup $ blueLED leds
+        ledSetup redLED
+        ledSetup greenLED
 
     received <- stateInit "can_received_count" (ival (0 :: Uint32))
     received2 <- stateInit "can2_received_count" (ival (0 :: Uint32))
@@ -62,8 +59,8 @@ app tocc totestcan1 totestcan2 touart toleds = do
         count <- deref received
         store received (count + 1)
         ifte_ (count .& 1 ==? 1)
-          (ledOff $ redLED leds)
-          (ledOn  $ redLED leds)
+          (ledOff redLED)
+          (ledOn  redLED)
 
     handler res2 "result2" $ do
       o <- emitter ostream 64
@@ -78,8 +75,8 @@ app tocc totestcan1 totestcan2 touart toleds = do
         puts o "\n\r/rcv\n\r"
 
         ifte_ (count .& 1 ==? 1)
-          (ledOff $ blueLED leds)
-          (ledOn  $ blueLED leds)
+          (ledOff greenLED)
+          (ledOn  greenLED)
 
 echoPrompt :: String
            -> ChanInput  ('Stored Uint8)

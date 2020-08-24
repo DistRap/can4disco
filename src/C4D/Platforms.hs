@@ -6,144 +6,58 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
 module C4D.Platforms
-  ( testPlatformParser
-  , ColoredLEDs(..)
-  , TestUART(..)
-  , TestI2C(..)
-  , TestCAN(..)
-  , TestDMA(..)
-  , TestPlatform(..)
-  , testplatform_clockconfig
-  , can4disco
-  , can1txLED
-  , can1rxLED
-  , can2txLED
-  , can2rxLED
-  ) where
+  (
+    buildC4DApp
+  , C4DPlatform(..)
+  , c4d
+  , module Hello.Tests.Platforms
+  )
+  where
 
-import Ivory.Tower.Config
-import Data.Char (toUpper)
-
-import qualified Ivory.BSP.STM32F405.CAN         as F405
-import qualified Ivory.BSP.STM32F405.UART        as F405
-import qualified Ivory.BSP.STM32F405.GPIO        as F405
-import qualified Ivory.BSP.STM32F405.GPIO.AF     as F405
-import qualified Ivory.BSP.STM32F405.I2C         as F405
-import qualified Ivory.BSP.STM32F405.RNG         as F405
-
-import Ivory.BSP.STM32.Peripheral.CAN
-import Ivory.BSP.STM32.Peripheral.GPIOF4
-import Ivory.BSP.STM32.Peripheral.UART
-import Ivory.BSP.STM32.Peripheral.I2C
-import Ivory.BSP.STM32.Peripheral.RNG
-import Ivory.BSP.STM32.Peripheral.UART.DMA
-import Ivory.BSP.STM32.ClockConfig
-import Ivory.BSP.STM32.Config
-
+import qualified Ivory.BSP.STM32F407 as F407
 import Ivory.Tower.Base
 
-testPlatformParser :: ConfigParser TestPlatform
-testPlatformParser = do
-  p <- subsection "args" $ subsection "platform" string
-  case map toUpper p of
-    "CAN4DISCO"       -> result can4disco
-    _ -> fail ("no such platform " ++ p)
+import Ivory.Tower
+import Ivory.BSP.STM32.ClockConfig
 
-  where
-  result platform = do
-    conf <- stm32ConfigParser (testplatform_stm32 platform)
-    return platform { testplatform_stm32 = conf }
+import Hello.Tests.Platforms.F4DISCO
+import Hello.Tests.Platforms
 
-data ColoredLEDs =
-  ColoredLEDs
-    { redLED  :: LED
-    , blueLED :: LED
-    }
+data C4DPlatform = C4DPlatform {
+    basePlatform :: Platform
+  , can1         :: CANConfig
+  , can2         :: CANConfig
+  , can1TxLED    :: LED
+  , can1RxLED    :: LED
+  , can2TxLED    :: LED
+  , can2RxLED    :: LED
+  }
 
-data TestUART =
-  TestUART
-    { testUARTPeriph :: UART
-    , testUARTPins   :: UARTPins
-    }
-
-data TestI2C =
-  TestI2C
-    { testI2C     :: I2CPeriph
-    , testI2CPins :: I2CPins
-    }
-
-data TestCAN =
-  TestCAN
-    { testCAN        :: CANPeriph
-    , testCANRX      :: GPIOPin
-    , testCANTX      :: GPIOPin
-    , testCANFilters :: CANPeriphFilters
-    }
-
-data TestDMA =
-  TestDMA
-    { testDMAUARTPeriph :: DMAUART
-    , testDMAUARTPins   :: UARTPins
-    }
-
-data TestPlatform =
-  TestPlatform
-    { testplatform_leds  :: ColoredLEDs
-    , testplatform_uart  :: TestUART
-    , testplatform_i2c   :: TestI2C
-    , testplatform_can1  :: TestCAN
-    , testplatform_can2  :: TestCAN
-    , testplatform_rng   :: RNG
-    , testplatform_stm32 :: STM32Config
-    }
-
-testplatform_clockconfig :: TestPlatform -> ClockConfig
-testplatform_clockconfig = stm32config_clock . testplatform_stm32
-
--- CAN4DISCO
-
-can4disco :: TestPlatform
-can4disco = TestPlatform
-  { testplatform_leds = ColoredLEDs
-      { redLED  = LED F405.pinD14 ActiveHigh
-      , blueLED = LED F405.pinD15 ActiveHigh
-      }
-  , testplatform_uart = TestUART
-    { testUARTPeriph = F405.uart2
-    , testUARTPins = UARTPins
-        { uartPinTx = F405.pinA2
-        , uartPinRx = F405.pinA3
-        , uartPinAF = F405.gpio_af_uart2
-        }
-    }
-  , testplatform_i2c = TestI2C
-      { testI2C = F405.i2c2
-      , testI2CPins = I2CPins
-        { i2cpins_sda = F405.pinB11
-        , i2cpins_scl = F405.pinB10
-        }
-      }
-  , testplatform_can1 = TestCAN
-      { testCAN = F405.can1
-      , testCANRX = F405.pinB8
-      , testCANTX = F405.pinB9
-      , testCANFilters = F405.canFilters
-      }
-   , testplatform_can2 = TestCAN
-      { testCAN = F405.can2
-      , testCANRX = F405.pinB5
-      , testCANTX = F405.pinB6
-      , testCANFilters = F405.canFilters
-      }
-  , testplatform_rng = F405.rng
-  , testplatform_stm32 = stm32f405Defaults 8
+-- wrapped f4disco helloworld Platform
+c4d :: C4DPlatform
+c4d = C4DPlatform {
+    basePlatform = f4disco
+  , can1         = f4discoCAN1
+  , can2         = f4discoCAN2
+  , can1TxLED    = LED F407.pinC8 ActiveHigh
+  , can1RxLED    = LED F407.pinC6 ActiveHigh
+  , can2TxLED    = LED F407.pinE8 ActiveHigh
+  , can2RxLED    = LED F407.pinE10 ActiveHigh
   }
 
 
-can1txLED, can1rxLED :: LED
-can1txLED  = LED F405.pinC8 ActiveHigh
-can1rxLED  = LED F405.pinC6 ActiveHigh
+buildC4DApp :: C4DPlatform
+            -> (
+                    (C4DPlatform -> ClockConfig)
+                 -> (C4DPlatform -> C4DPlatform)
+                 -> Tower C4DPlatform ()
+               )
+            -> IO ()
+buildC4DApp = buildWrappedApp unWrap wrap
+ where
+   unWrap :: C4DPlatform -> Platform
+   unWrap = basePlatform
 
-can2txLED, can2rxLED :: LED
-can2txLED  = LED F405.pinE8 ActiveHigh
-can2rxLED  = LED F405.pinE10 ActiveHigh
+   wrap :: Platform -> C4DPlatform
+   wrap x = c4d { basePlatform = x }
+

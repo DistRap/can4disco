@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module C4D.Tests.CANSendRecv where
@@ -19,14 +20,13 @@ import Ivory.Tower.Base
 import C4D.Platforms
 
 app :: (e -> ClockConfig)
-    -> (e -> TestCAN)
-    -> (e -> ColoredLEDs)
+    -> (e -> C4DPlatform)
     -> Tower e ()
-app tocc totestcan toleds = do
-  can  <- fmap totestcan getEnv
-  leds <- fmap toleds    getEnv
+app tocc toPlatform = do
+  C4DPlatform{..} <- fmap toPlatform getEnv
+  let redLED = platformRedLED $ basePlatform
 
-  (res, req, _, _) <- canTower tocc (testCAN can) 1000000 (testCANRX can) (testCANTX can)
+  (res, req, _, _) <- canTower tocc (canPeriph can1) 1000000 (canRxPin can1) (canTxPin can1)
 
   periodic <- period (Milliseconds 250)
 
@@ -34,11 +34,11 @@ app tocc totestcan toleds = do
     handler systemInit "init" $ do
       callback $ const $ do
         let emptyID = CANFilterID32 (fromRep 0) (fromRep 0) False False
-        canFilterInit (testCANFilters can)
+        canFilterInit (canPeriphFilters can1)
                       [CANFilterBank CANFIFO0 CANFilterMask $ CANFilter32 emptyID emptyID]
                       []
-        ledSetup $ redLED leds
-        ledOn    $ redLED leds
+        ledSetup redLED
+        ledOn    redLED
 
     tx_pending <- state "tx_pending"
     last_sent  <- state "last_sent"
@@ -78,5 +78,5 @@ app tocc totestcan toleds = do
         count <- deref received
         store received (count + 1)
         ifte_ (count .& 1 ==? 0)
-          (ledOff $ redLED leds)
-          (ledOn  $ redLED leds)
+          (ledOff redLED)
+          (ledOn  redLED)
