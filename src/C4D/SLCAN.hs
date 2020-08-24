@@ -77,7 +77,7 @@ slCANTower ostream istream canctl canres canReinit = do
         tspeed <- deref (transSpeed)
 
         when tinit $ do
-          emptyframe <- local $ istruct []
+          emptyframe <- local $ izero
           refCopy canframe emptyframe
 
           store ignore false
