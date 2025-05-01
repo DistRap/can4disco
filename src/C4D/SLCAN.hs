@@ -13,23 +13,29 @@ import Ivory.Tower
 import Ivory.Tower.Base
 import Ivory.Tower.HAL.Bus.CAN
 
--- http://elixir.free-electrons.com/linux/v4.11.3/source/drivers/net/can/slcan.c
-
--- serial line CAN interface driver (SLCAN)
--- basically UART -> CAN -> UART bridge
--- supported in kernel via slcand
+-- | Serial line CAN interface driver (SLCAN)
+--
+-- Basically UART -> CAN -> UART bridge
+-- Supported in kernel via slcand
+-- https://github.com/torvalds/linux/blob/master/drivers/net/can/slcan/slcan-core.c
 --
 -- canReinit function is abstracted out so this can run on posix as well
 --
 -- Pass your own reinit function e.g.:
 --   let canReinit baud = canInit (testCAN can) baud (testCANRX can) (testCANTX can) cc
 --
--- Use slCANTowerSimple on posix
+-- Use @slCANTowerSimple@ on posix
 slCANTower :: ChanInput  ('Stored Uint8)
            -> ChanOutput ('Stored Uint8)
            -> ChanInput  ('Struct "can_message")
            -> ChanOutput ('Struct "can_message")
-           -> (forall s eff . (GetAlloc eff ~ 'Scope s,  'Break ~ GetBreaks (AllowBreak eff)) => Integer -> Ivory eff ())
+           -> (forall s eff
+               . ( GetAlloc eff ~ 'Scope s
+                 , 'Break ~ GetBreaks (AllowBreak eff)
+                 )
+               => Integer
+               -> Ivory eff ()
+              )
            -> Tower p ()
 slCANTower ostream istream canctl canres canReinit = do
   towerDepends canDriverTypes
