@@ -61,4 +61,12 @@ app tocc toPlatform = do
         ledSetup $ can1TxLED
         ledSetup $ can1RxLED
 
-  where canReinit cc can baud = canInit (canPeriph can) baud (canRxPin  can) (canTxPin  can) cc
+  where
+    canReinit cc can baud = do
+      -- We could use a less nuclear deinit
+      -- like setBit can_mcr_inrq which would
+      -- wait for transmissions to end and allow
+      -- changing bit timing but it doesn't really
+      -- matter for this use case
+      canRCCDisable (canPeriph can)
+      canInit (canPeriph can) baud (canRxPin  can) (canTxPin  can) cc
